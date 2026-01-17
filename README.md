@@ -19,6 +19,19 @@ The library takes JSON as input and outputs JSON. The JSON format is as follows:
 }
 ```
 
+## Features
+
+### Reordering
+*   **Drag and Drop**: Click and drag any row to move it.
+*   **Multi-Select**: Click the line numbers to select multiple contiguous rows and drag them together.
+
+### Editing Content
+*   **Inline Editing**: Click on the text of any row to edit it directly.
+*   **Insert Lines**: Hover between any two rows (or at the top/bottom) to reveal a blue line with a `+` button. Click it to insert a new empty line.
+*   **Delete Lines**: Click the red `×` button on the right side of a row to delete it.
+    *   **Confirmation**: To prevent accidental deletion, you will be asked to confirm (Click `✓` to confirm, `×` to cancel).
+
+
 ## Sample
 See `sample.html` for a complete working example using `sample.json` data.
 
