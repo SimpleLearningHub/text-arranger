@@ -12,8 +12,189 @@ class TextArranger {
         this.data = data;
         this.container = container;
         this.outputArea = outputArea;
+        this.pendingDeleteIndex = null;
         this.handleDragOver = this.handleDragOver.bind(this);
+        this.injectStyles();
     }
+
+    /**
+     * Injects the necessary CSS styles for the dividers.
+     */
+    injectStyles() {
+        if (document.getElementById('text-arranger-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'text-arranger-styles';
+        style.textContent = `
+            .text-arranger-divider {
+                height: 12px;
+                position: relative;
+                cursor: pointer;
+                opacity: 0;
+                transition: opacity 0.2s;
+            }
+            .text-arranger-divider:hover {
+                opacity: 1;
+            }
+            .text-arranger-divider::before {
+                content: '';
+                position: absolute;
+                top: 50%;
+                left: 0;
+                right: 0;
+                border-top: 2px dashed #0d6efd;
+                z-index: 0;
+            }
+            .text-arranger-divider-btn {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 20px;
+                height: 20px;
+                background: #0d6efd;
+                color: white;
+                border-radius: 50%;
+                font-size: 16px;
+                line-height: 18px;
+                text-align: center;
+                z-index: 1;
+                pointer-events: none; /* Let the parent click handle it */
+            }
+            .text-arranger-delete-btn {
+                width: 24px;
+                height: 24px;
+                padding: 0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #dc3545;
+                background: transparent;
+                border: none;
+                cursor: pointer;
+                opacity: 0.5;
+                transition: opacity 0.2s;
+            }
+            .text-arranger-delete-btn:hover {
+                opacity: 1;
+                background: rgba(220, 53, 69, 0.1);
+                border-radius: 4px;
+            }
+            .text-arranger-confirm-btn {
+                color: #198754;
+            }
+            .text-arranger-confirm-btn:hover {
+                background: rgba(25, 135, 84, 0.1);
+                border-radius: 4px;
+                opacity: 1;
+            }
+            .text-arranger-cancel-btn {
+                 color: #6c757d;
+            }
+            .text-arranger-cancel-btn:hover {
+                background: rgba(108, 117, 125, 0.1);
+                border-radius: 4px;
+                opacity: 1;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    /**
+     * Adds a new empty line at the specified index.
+     * @param {number} index - The index to insert the new line at.
+     */
+    addLine(index) {
+        this.syncDataFromDOM();
+        const newLine = {
+            lineNumber: 0, // Will be re-indexed
+            text: ""
+        };
+        this.data.lines.splice(index, 0, newLine);
+
+        // Re-sequence all lines
+        this.data.lines.forEach((line, i) => {
+            line.lineNumber = i + 1;
+        });
+
+        this.render();
+
+        // Focus the new line
+        // We need to wait for render to complete
+        setTimeout(() => {
+            const rows = this.container.querySelectorAll('.list-group-item');
+            if (rows[index]) {
+                const colText = rows[index].querySelector('.col[contenteditable="true"]');
+                if (colText) colText.focus();
+            }
+        }, 0);
+    }
+
+    /**
+     * Deletes the line at the specified index.
+     * @param {number} index - The index of the line to delete.
+     */
+    deleteLine(index) {
+        this.syncDataFromDOM();
+        this.data.lines.splice(index, 1);
+
+        // Re-sequence all lines
+        this.data.lines.forEach((line, i) => {
+            line.lineNumber = i + 1;
+        });
+
+        this.pendingDeleteIndex = null;
+        this.render();
+        this.updateJsonOutput();
+    }
+
+    /**
+     * Initiates the delete confirmation for a line.
+     * @param {number} index - The index of the line to delete.
+     */
+    requestDelete(index) {
+        this.syncDataFromDOM();
+        this.pendingDeleteIndex = index;
+        this.render();
+    }
+
+    /**
+     * Cancels the pending delete action.
+     */
+    cancelDelete() {
+        this.syncDataFromDOM();
+        this.pendingDeleteIndex = null;
+        this.render();
+    }
+
+    /**
+     * Creates a divider element.
+     * @param {number} index - The index where the new line will be inserted if clicked.
+     * @returns {HTMLElement} The divider element.
+     */
+    createDivider(index) {
+        const divider = document.createElement('div');
+        divider.classList.add('text-arranger-divider', 'w-100');
+        divider.title = 'Click to add line';
+
+        const btn = document.createElement('div');
+        btn.classList.add('text-arranger-divider-btn');
+        btn.innerHTML = '+';
+
+        divider.appendChild(btn);
+
+        divider.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent interfering with other clicks
+            this.addLine(index);
+        });
+
+        divider.addEventListener('dragover', (e) => {
+            e.preventDefault(); // allow drops nearby but don't error
+            e.stopPropagation();
+        });
+
+        return divider;
+    }
+
 
     /**
      * Renders the list of lines into the container.
@@ -29,8 +210,18 @@ class TextArranger {
             return;
         }
 
-        this.data.lines.forEach(item => {
+        // Add separator at the top
+        this.container.appendChild(this.createDivider(0));
+
+        this.data.lines.forEach((item, index) => {
             const lineDiv = document.createElement('div');
+            // ... (existing lineDiv logic) ...
+
+            // Note: We need to reconstruct the lineDiv logic because we are replacing the loop.
+            // However, to keep this efficient in "multi_replace", I should probably wrap the existing loop body or 
+            // if I cannot reference existing code easily, I have to duplicate the loop body logic here.
+            // Since the tool requires exact target content match, reusing the exact existing loop code is best.
+
             lineDiv.classList.add('list-group-item', 'py-0', 'px-2', 'border-start-0');
             lineDiv.dataset.lineNumber = item.lineNumber;
             lineDiv.draggable = true;
@@ -73,9 +264,58 @@ class TextArranger {
             colText.contentEditable = true;
             colText.textContent = item.text;
 
+            // Column 3: Delete Button
+            const colDelete = document.createElement('div');
+            colDelete.classList.add('col-auto', 'p-0');
+            colDelete.style.width = '30px';
+            colDelete.style.height = '24px';
+            colDelete.style.display = 'flex';
+            colDelete.style.alignItems = 'center';
+            colDelete.style.justifyContent = 'center';
+
+            if (this.pendingDeleteIndex === index) {
+                // Confirm Delete (Check)
+                const btnConfirm = document.createElement('button');
+                btnConfirm.classList.add('text-arranger-delete-btn', 'text-arranger-confirm-btn');
+                btnConfirm.innerHTML = '&#10003;'; // Checkmark
+                btnConfirm.title = 'Confirm Delete';
+                btnConfirm.onclick = (e) => {
+                    e.stopPropagation();
+                    this.deleteLine(index);
+                };
+
+                // Cancel Delete (X or Back)
+                const btnCancel = document.createElement('button');
+                btnCancel.classList.add('text-arranger-delete-btn', 'text-arranger-cancel-btn');
+                btnCancel.innerHTML = '&#10005;'; // Cross
+                btnCancel.title = 'Cancel';
+                btnCancel.onclick = (e) => {
+                    e.stopPropagation();
+                    this.cancelDelete();
+                };
+
+                colDelete.innerHTML = '';
+                colDelete.style.width = '60px'; // Expand width for 2 buttons
+                colDelete.appendChild(btnConfirm);
+                colDelete.appendChild(btnCancel);
+            } else {
+                const btnDelete = document.createElement('button');
+                btnDelete.classList.add('text-arranger-delete-btn');
+                btnDelete.innerHTML = '&times;'; // Multiplication sign as X
+                btnDelete.title = 'Delete line';
+                btnDelete.onclick = () => this.requestDelete(index);
+
+                colDelete.innerHTML = '';
+                colDelete.style.width = '30px'; // Reset width
+                colDelete.appendChild(btnDelete);
+            }
+
+            colDelete.appendChild(document.createTextNode('')); // Ensure child nodes are updated
+
             // Append columns to row
             row.appendChild(colSwitch);
             row.appendChild(colText);
+            row.appendChild(colDelete);
 
             colText.addEventListener('keyup', () => {
                 this.updateJsonOutput();
@@ -104,29 +344,30 @@ class TextArranger {
                 const allCheckboxes = this.container.querySelectorAll('input[type="checkbox"]');
                 allCheckboxes.forEach(cb => cb.checked = false);
 
-                // Resequence lines
+                // Sync data from DOM state
                 const currentRows = this.container.querySelectorAll('.list-group-item');
+                const newLines = [];
                 currentRows.forEach((row, index) => {
-                    const newLineNumber = index + 1;
-
-                    // Update dataset
-                    row.dataset.lineNumber = newLineNumber;
-
-                    // Update controls
-                    const btnCheck = row.querySelector('input[type="checkbox"]');
-                    const btnLabel = row.querySelector('label');
-
-                    if (btnCheck && btnLabel) {
-                        btnCheck.id = `btn-check-${newLineNumber}`;
-                        btnLabel.setAttribute('for', `btn-check-${newLineNumber}`);
-                        btnLabel.textContent = newLineNumber;
+                    const colText = row.querySelector('.col[contenteditable="true"]');
+                    if (colText) {
+                        newLines.push({
+                            lineNumber: index + 1,
+                            text: colText.textContent
+                        });
                     }
                 });
 
+                this.data.lines = newLines;
+
+                // Re-render to fix dividers and sequence
+                this.render();
                 this.updateJsonOutput();
             });
 
             this.container.appendChild(lineDiv);
+
+            // Add separator after each item
+            this.container.appendChild(this.createDivider(index + 1));
         });
     }
 
@@ -209,6 +450,31 @@ class TextArranger {
                     if (cb) cb.checked = false;
                 }
             });
+        }
+    }
+
+    /**
+     * Synchronizes the internal data with the DOM state.
+     * This ensures any unsaved text edits are captured before a re-render.
+     */
+    syncDataFromDOM() {
+        if (!this.container) return;
+        const currentRows = this.container.querySelectorAll('.list-group-item');
+        const lines = [];
+
+        currentRows.forEach((row, index) => {
+            const colText = row.querySelector('.col[contenteditable="true"]');
+            if (colText) {
+                lines.push({
+                    lineNumber: index + 1,
+                    text: colText.textContent
+                });
+            }
+        });
+
+        // Preserve data integrity if DOM is empty (unlikely but safe)
+        if (lines.length > 0 || this.data.lines.length === 0) {
+            this.data.lines = lines;
         }
     }
 
